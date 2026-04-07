@@ -272,6 +272,23 @@ body {
   font-size: 13px;
 }
 
+.json-editor-container {
+  border: 1px solid #e8e8e8;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.json-editor-container .cm-editor {
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 13px;
+}
+
+.json-error {
+  padding: 8px 12px;
+  background: #fff2f0;
+  border-top: 1px solid #ffccc7;
+}
+
 /* Response Viewer */
 .response-viewer {
   display: flex;

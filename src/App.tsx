@@ -83,7 +83,7 @@ function App() {
     }
   }, [currentRequest]);
 
-  const handleSaveRequest = useCallback(async (collectionId: string | null) => {
+  const handleSaveRequest = useCallback(async (collectionId: string | null, name: string) => {
     if (!currentRequest) return;
 
     try {
@@ -91,6 +91,7 @@ function App() {
         await createSavedRequest({
           ...currentRequest,
           id: uuidv4(),
+          name: name,
           collectionId: collectionId,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
@@ -99,6 +100,7 @@ function App() {
       } else {
         await updateSavedRequest({
           ...currentRequest,
+          name: name,
           collectionId: collectionId,
           updatedAt: new Date().toISOString(),
         });

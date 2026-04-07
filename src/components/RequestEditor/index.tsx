@@ -10,6 +10,7 @@ import {
   Modal,
   message,
   Popconfirm,
+  Tooltip,
 } from 'antd';
 import {
   SendOutlined,
@@ -19,7 +20,11 @@ import {
   InboxOutlined,
   CopyOutlined,
   FileAddOutlined,
+  FormatPainterOutlined,
 } from '@ant-design/icons';
+import CodeMirror from '@uiw/react-codemirror';
+import { json, jsonParseLinter } from '@codemirror/lang-json';
+import { linter } from '@codemirror/lint';
 import type { TabsProps } from 'antd';
 import type { RequestConfig, KeyValue, HttpMethod, FormDataField, Collection } from '../../types';
 import { exportToCurl } from '../../services/curl';
@@ -32,7 +37,7 @@ interface RequestEditorProps {
   request: RequestConfig | null;
   onRequestChange: (request: RequestConfig) => void;
   onSend: () => void;
-  onSave: (collectionId: string | null) => void;
+  onSave: (collectionId: string | null, name: string) => void;
   onArchive: () => void;
   loading: boolean;
   isNew: boolean;
@@ -76,6 +81,7 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
   const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
   const [curlModalVisible, setCurlModalVisible] = useState(false);
   const [curlCommand, setCurlCommand] = useState('');
+  const [jsonError, setJsonError] = useState<string | null>(null);
 
   useEffect(() => {
     if (request) {
@@ -94,6 +100,42 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
   const loadCollections = async () => {
     const data = await db.getCollections();
     setCollections(data);
+  };
+
+  // 格式化 JSON
+  const formatJson = () => {
+    if (!request?.body) return;
+    try {
+      const parsed = JSON.parse(request.body);
+      const formatted = JSON.stringify(parsed, null, 2);
+      updateRequest({ body: formatted });
+      setJsonError(null);
+      message.success('格式化成功');
+    } catch {
+      message.error('JSON 格式错误，无法格式化');
+    }
+  };
+
+  // 验证 JSON
+  const validateJson = (value: string) => {
+    if (!value.trim()) {
+      setJsonError(null);
+      return;
+    }
+    try {
+      JSON.parse(value);
+      setJsonError(null);
+    } catch (e) {
+      if (e instanceof Error) {
+        setJsonError(e.message);
+      }
+    }
+  };
+
+  // 处理 JSON body 变更
+  const handleJsonChange = (value: string) => {
+    updateRequest({ body: value });
+    validateJson(value);
   };
 
   if (!request) {
@@ -198,7 +240,8 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
     }
     updateRequest({ name: requestName.trim() });
     setNameModalVisible(false);
-    onSave(selectedCollectionId);
+    // 传递名称给 onSave
+    onSave(selectedCollectionId, requestName.trim());
   };
 
   const handleExportCurl = () => {
@@ -412,6 +455,17 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
               ]}
               style={{ width: 120 }}
             />
+            {request.bodyType === 'json' && (
+              <Tooltip title="格式化 JSON">
+                <Button
+                  size="small"
+                  icon={<FormatPainterOutlined />}
+                  onClick={formatJson}
+                >
+                  格式化
+                </Button>
+              </Tooltip>
+            )}
           </Space>
           {request.bodyType === 'multipart' && (
             <div className="multipart-editor">
@@ -427,11 +481,28 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
               </Button>
             </div>
           )}
-          {request.bodyType !== 'none' && request.bodyType !== 'multipart' && (
+          {request.bodyType === 'json' && (
+            <div className="json-editor-container">
+              <CodeMirror
+                value={request.body}
+                height="300px"
+                extensions={[json(), linter(jsonParseLinter())]}
+                onChange={(value) => handleJsonChange(value)}
+                theme="dark"
+                placeholder='{"key": "value"}'
+              />
+              {jsonError && (
+                <div className="json-error" style={{ color: '#ff4d4f', fontSize: 12, marginTop: 4 }}>
+                  JSON 错误: {jsonError}
+                </div>
+              )}
+            </div>
+          )}
+          {request.bodyType !== 'none' && request.bodyType !== 'multipart' && request.bodyType !== 'json' && (
             <TextArea
               value={request.body}
               onChange={(e) => updateRequest({ body: e.target.value })}
-              placeholder={request.bodyType === 'json' ? '{"key": "value"}' : 'Request body'}
+              placeholder="Request body"
               className="body-textarea"
               autoSize={{ minRows: 10, maxRows: 20 }}
             />
