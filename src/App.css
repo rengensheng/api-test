@@ -24,12 +24,18 @@ body {
 .sidebar {
   background: #fafafa !important;
   border-right: 1px solid #e8e8e8;
+}
+
+.sidebar .ant-layout-sider-children {
   display: flex;
   flex-direction: column;
+  height: 100%;
+  overflow: hidden;
 }
 
 .sidebar-menu {
   border-bottom: 1px solid #e8e8e8;
+  flex-shrink: 0;
 }
 
 .sidebar-content {
@@ -37,6 +43,7 @@ body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  min-height: 0;
 }
 
 .sidebar-header {
@@ -62,6 +69,7 @@ body {
   flex: 1;
   overflow-y: auto;
   padding: 8px;
+  min-height: 0;
 }
 
 .sidebar-item {
