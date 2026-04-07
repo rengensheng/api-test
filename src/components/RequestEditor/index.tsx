@@ -485,7 +485,7 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
             <div className="json-editor-container">
               <CodeMirror
                 value={request.body}
-                height="300px"
+                height="500px"
                 extensions={[json(), linter(jsonParseLinter())]}
                 onChange={(value) => handleJsonChange(value)}
                 theme="dark"

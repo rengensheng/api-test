@@ -156,10 +156,10 @@ function App() {
     };
     setCurrentRequest(config);
     setResponse(null);
-    setIsNewRequest(false);
-    if ('collectionId' in request) {
-      setSelectedCollectionId(request.collectionId);
-    }
+    // 只有 SavedRequest（有 collectionId 属性）才视为已保存的请求，历史记录和归档都视为新请求
+    const isSavedRequest = 'collectionId' in request;
+    setIsNewRequest(!isSavedRequest);
+    setSelectedCollectionId(isSavedRequest ? request.collectionId : null);
   }, []);
 
   const handleNewRequest = useCallback(() => {
