@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Layout, message, ConfigProvider, theme } from 'antd';
 import { Sidebar } from './components/Sidebar';
 import { RequestEditor } from './components/RequestEditor';
@@ -35,17 +35,64 @@ function App() {
   const [isNewRequest, setIsNewRequest] = useState(true);
   const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
 
+  // 动态宽度状态
+  const [sidebarWidth, setSidebarWidth] = useState(300);
+  const [editorWidth, setEditorWidth] = useState(500);
+  const isResizingSidebar = useRef(false);
+  const isResizingEditor = useRef(false);
+
   useEffect(() => {
     initDatabase()
       .then(() => {
         setDbInitialized(true);
-        message.success('数据库初始化成功');
       })
       .catch((err) => {
         console.error('Database init error:', err);
         message.error('数据库初始化失败');
       });
   }, []);
+
+  // 处理拖拽调整宽度
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (isResizingSidebar.current) {
+        const newWidth = Math.max(200, Math.min(500, e.clientX));
+        setSidebarWidth(newWidth);
+      }
+      if (isResizingEditor.current) {
+        const containerLeft = sidebarWidth;
+        const newWidth = Math.max(300, Math.min(e.clientX - containerLeft, window.innerWidth - containerLeft - 300));
+        setEditorWidth(newWidth);
+      }
+    };
+
+    const handleMouseUp = () => {
+      isResizingSidebar.current = false;
+      isResizingEditor.current = false;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [sidebarWidth]);
+
+  const startResizeSidebar = () => {
+    isResizingSidebar.current = true;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  };
+
+  const startResizeEditor = () => {
+    isResizingEditor.current = true;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  };
 
   const handleSendRequest = useCallback(async () => {
     if (!currentRequest || !currentRequest.url) {
@@ -200,6 +247,11 @@ function App() {
           onSelectRequest={handleSelectRequest}
           onNewRequest={handleNewRequest}
           refreshTrigger={refreshTrigger}
+          width={sidebarWidth}
+        />
+        <div
+          className="resize-bar resize-bar-sidebar"
+          onMouseDown={startResizeSidebar}
         />
         <Layout className="main-layout">
           <Content className="main-content">
@@ -207,7 +259,7 @@ function App() {
               <CurlImport onImport={handleImportCurl} />
             </div>
             <div className="editor-response-container">
-              <div className="editor-panel">
+              <div className="editor-panel" style={{ width: editorWidth }}>
                 <RequestEditor
                   request={currentRequest}
                   onRequestChange={setCurrentRequest}
@@ -219,7 +271,11 @@ function App() {
                   selectedCollectionId={selectedCollectionId}
                 />
               </div>
-              <div className="response-panel">
+              <div
+                className="resize-bar resize-bar-editor"
+                onMouseDown={startResizeEditor}
+              />
+              <div className="response-panel" style={{ flex: 1 }}>
                 <ResponseViewer response={response} loading={loading} />
               </div>
             </div>

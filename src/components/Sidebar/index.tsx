@@ -38,6 +38,7 @@ interface SidebarProps {
   onSelectRequest: (request: SavedRequest | HistoryItem | ArchivedRequest) => void;
   onNewRequest: () => void;
   refreshTrigger: number;
+  width?: number;
 }
 
 const methodColors: Record<HttpMethod, string> = {
@@ -56,6 +57,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSelectRequest,
   onNewRequest,
   refreshTrigger,
+  width = 300,
 }) => {
   const [collections, setCollections] = useState<Collection[]>([]);
   const [savedRequests, setSavedRequests] = useState<SavedRequest[]>([]);
@@ -283,7 +285,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
         <div className="sidebar-actions">
           <Button icon={<FolderAddOutlined />} onClick={() => setNewCollectionModal(true)}>
-            新建集合
+            新建
           </Button>
           <Button icon={<ImportOutlined />} onClick={handleImport}>
             导入
@@ -476,7 +478,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   ];
 
   return (
-    <Sider width={300} className="sidebar">
+    <Sider width={width} className="sidebar">
       <Menu
         mode="horizontal"
         selectedKeys={[activeTab]}

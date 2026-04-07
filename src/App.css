@@ -20,10 +20,30 @@ body {
   background: #fff;
 }
 
+/* Resize Bar */
+.resize-bar {
+  width: 6px;
+  background: transparent;
+  cursor: col-resize;
+  transition: background-color 0.2s;
+  flex-shrink: 0;
+}
+
+.resize-bar:hover {
+  background: #1890ff;
+}
+
+.resize-bar-sidebar {
+  position: relative;
+}
+
+.resize-bar-editor {
+  position: relative;
+}
+
 /* Sidebar */
 .sidebar {
   background: #fafafa !important;
-  border-right: 1px solid #e8e8e8;
 }
 
 .sidebar .ant-layout-sider-children {
@@ -161,18 +181,18 @@ body {
 }
 
 .editor-panel {
-  flex: 1;
   display: flex;
   flex-direction: column;
-  border-right: 1px solid #e8e8e8;
   min-width: 0;
+  flex-shrink: 0;
 }
 
 .response-panel {
-  flex: 1;
   display: flex;
   flex-direction: column;
   min-width: 0;
+  flex: 1;
+  border-right: 1px solid #e8e8e8;
 }
 
 /* Request Editor */

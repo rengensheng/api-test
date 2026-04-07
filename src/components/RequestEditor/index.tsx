@@ -550,7 +550,7 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
       </div>
       <div className="request-actions">
         <Button icon={<SaveOutlined />} onClick={() => setNameModalVisible(true)}>
-          保存
+          {isNew ? '保存' : '更新'}
         </Button>
         {!isNew && (
           <Popconfirm
