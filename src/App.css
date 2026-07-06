@@ -243,7 +243,6 @@ body {
 
 /* ── Inputs / Select / Textarea ── */
 .flaw-input,
-.flaw-select,
 .flaw-textarea {
   border: 1px solid var(--border-default);
   border-radius: 2px;
@@ -252,15 +251,14 @@ body {
   font-family: var(--font-sans);
   font-size: 13px;
   outline: none;
+  width: 100%;
   transition: border-color var(--ease-fast), background-color var(--ease-fast);
 }
 .flaw-input:hover,
-.flaw-select:hover,
 .flaw-textarea:hover {
   border-color: var(--border-hover);
 }
 .flaw-input:focus,
-.flaw-select:focus,
 .flaw-textarea:focus {
   border-color: var(--accent-orange);
 }
@@ -273,15 +271,124 @@ body {
   height: 32px;
   padding: 0 10px;
 }
-.flaw-select {
-  height: 32px;
-  padding: 0 8px;
-  cursor: pointer;
-}
 .flaw-textarea {
   padding: 10px;
   resize: vertical;
   min-height: 80px;
+}
+
+/* ── Custom Select ── */
+.flaw-select-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.flaw-select-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  height: 32px;
+  padding: 0 8px 0 10px;
+  border: 1px solid var(--border-default);
+  border-radius: 2px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  cursor: pointer;
+  outline: none;
+  width: 100%;
+  min-width: 0;
+  transition: border-color var(--ease-fast), background-color var(--ease-fast);
+  user-select: none;
+}
+.flaw-select-trigger:hover {
+  border-color: var(--border-hover);
+}
+.flaw-select-trigger:focus-visible,
+.flaw-select-trigger.is-open {
+  border-color: var(--accent-orange);
+}
+
+.flaw-select-value {
+  flex: 1;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1;
+}
+.flaw-select-value.placeholder {
+  color: var(--text-muted);
+}
+
+.flaw-select-arrow {
+  flex-shrink: 0;
+  transition: transform var(--ease-fast);
+  color: var(--text-muted);
+}
+.flaw-select-arrow.is-open {
+  transform: rotate(180deg);
+  color: var(--text-secondary);
+}
+
+.flaw-select-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 500;
+  min-width: 100%;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-default);
+  border-radius: 2px;
+  box-shadow: var(--shadow-panel);
+  margin-top: 4px;
+  padding: 4px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.flaw-select-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  padding: 6px 10px;
+  padding-right: 8px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  cursor: pointer;
+  border-radius: 2px;
+  white-space: nowrap;
+  transition: background-color var(--ease-fast), color var(--ease-fast);
+}
+
+.flaw-select-option:hover,
+.flaw-select-option.is-highlighted {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.flaw-select-option.is-selected {
+  color: var(--accent-orange);
+}
+
+.flaw-select-check {
+  flex-shrink: 0;
+  color: var(--accent-orange);
+}
+
+.flaw-select-empty {
+  padding: 8px 10px;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-align: center;
 }
 
 /* ── Tabs ── */
@@ -545,6 +652,16 @@ body {
   background: transparent;
 }
 .flaw-table .flaw-input:focus {
+  border-color: var(--accent-orange);
+  background: var(--bg-primary);
+}
+.flaw-table .flaw-select-trigger {
+  height: 28px;
+  border-color: transparent;
+  background: transparent;
+}
+.flaw-table .flaw-select-trigger:focus-visible,
+.flaw-table .flaw-select-trigger.is-open {
   border-color: var(--accent-orange);
   background: var(--bg-primary);
 }
@@ -827,8 +944,10 @@ body {
   background: var(--bg-secondary);
   flex-shrink: 0;
 }
-.request-url-bar .flaw-select {
+.request-url-bar .flaw-select-wrap {
   width: 100px;
+}
+.request-url-bar .flaw-select-trigger {
   font-weight: 600;
   font-family: var(--font-mono);
 }
@@ -1098,23 +1217,23 @@ body {
 }
 
 /* ── Method Select Colors ── */
-.flaw-select option[value='GET'] {
+.method-select[data-value='GET'] .flaw-select-trigger {
   color: var(--accent-green);
 }
-.flaw-select option[value='POST'] {
+.method-select[data-value='POST'] .flaw-select-trigger {
   color: var(--accent-blue);
 }
-.flaw-select option[value='PUT'] {
+.method-select[data-value='PUT'] .flaw-select-trigger {
   color: var(--accent-orange);
 }
-.flaw-select option[value='DELETE'] {
+.method-select[data-value='DELETE'] .flaw-select-trigger {
   color: var(--accent-red);
 }
-.flaw-select option[value='PATCH'] {
+.method-select[data-value='PATCH'] .flaw-select-trigger {
   color: var(--accent-cyan);
 }
-.flaw-select option[value='HEAD'],
-.flaw-select option[value='OPTIONS'] {
+.method-select[data-value='HEAD'] .flaw-select-trigger,
+.method-select[data-value='OPTIONS'] .flaw-select-trigger {
   color: var(--accent-purple);
 }
 
