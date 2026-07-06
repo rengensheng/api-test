@@ -1,52 +1,47 @@
-import React, { useState, useMemo } from "react";
-import { Tabs, Empty, Tag, Spin, Button, message } from "antd";
-import { CopyOutlined } from "@ant-design/icons";
-import type { TabsProps } from "antd";
-import type { ResponseData } from "../../types";
-import { JsonView } from "react-json-view-lite";
-import "react-json-view-lite/dist/index.css";
+import { useState, useMemo } from 'react';
+import { Button, Empty, Spin, Tabs, Tag, message } from '../ui';
+import type { ResponseData } from '../../types';
+
+import { JsonView } from 'react-json-view-lite';
+import 'react-json-view-lite/dist/index.css';
 
 interface ResponseViewerProps {
   response: ResponseData | null;
   loading: boolean;
 }
 
-const getStatusColor = (status: number): string => {
-  if (status < 200) return "default";
-  if (status < 300) return "success";
-  if (status < 400) return "warning";
-  return "error";
+const getStatusColor = (status: number) => {
+  if (status < 200) return 'default' as const;
+  if (status < 300) return 'green' as const;
+  if (status < 400) return 'orange' as const;
+  return 'red' as const;
 };
 
-const formatSize = (bytes: number): string => {
+const formatSize = (bytes: number) => {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(2)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 };
 
-const formatTime = (ms: number): string => {
-  if (ms < 1000) return `${ms} ms`;
-  return `${(ms / 1000).toFixed(2)} s`;
-};
+const formatTime = (ms: number) => (ms < 1000 ? `${ms} ms` : `${(ms / 1000).toFixed(2)} s`);
 
-export const ResponseViewer: React.FC<ResponseViewerProps> = ({
-  response,
-  loading,
-}) => {
-  const [activeTab, setActiveTab] = useState("body");
-
-  const handleCopy = () => {
-    if (response?.data) {
-      navigator.clipboard.writeText(response.data);
-      message.success("已复制到剪贴板");
+export const ResponseViewer = ({ response, loading }: ResponseViewerProps) => {
+  const [activeTab, setActiveTab] = useState('body');
+  const handleCopy = async () => {
+    if (!response?.data) return;
+    try {
+      await navigator.clipboard.writeText(response.data);
+      message.success('已复制到剪贴板');
+    } catch {
+      message.error('复制失败');
     }
   };
+
 
   const { isJson, jsonData } = useMemo(() => {
     if (!response?.data) return { isJson: false, jsonData: null };
     try {
-      const parsed = JSON.parse(response.data);
-      return { isJson: true, jsonData: parsed };
+      return { isJson: true, jsonData: JSON.parse(response.data) };
     } catch {
       return { isJson: false, jsonData: null };
     }
@@ -55,7 +50,7 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
   if (loading) {
     return (
       <div className="response-viewer loading">
-        <Spin size="large" tip="请求发送中..." />
+        <Spin tip="请求发送中..." />
       </div>
     );
   }
@@ -68,14 +63,14 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
     );
   }
 
-  const tabs: TabsProps["items"] = [
+  const tabs = [
     {
-      key: "body",
-      label: "Body",
+      key: 'body',
+      label: 'Body',
       children: (
         <div className="response-body">
           <div className="response-body-actions">
-            <Button icon={<CopyOutlined />} onClick={handleCopy} size="small">
+            <Button icon="copy" onClick={handleCopy} size="sm">
               复制
             </Button>
           </div>
@@ -90,8 +85,8 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
       ),
     },
     {
-      key: "headers",
-      label: "Headers",
+      key: 'headers',
+      label: 'Headers',
       children: (
         <div className="response-headers">
           <table className="headers-table">
@@ -120,12 +115,7 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
         </span>
       </div>
       <div className="container">
-        <Tabs
-          activeKey={activeTab}
-          onChange={setActiveTab}
-          items={tabs}
-          className="response-tabs"
-        />
+        <Tabs activeKey={activeTab} onChange={setActiveTab} items={tabs} className="response-tabs" />
       </div>
     </div>
   );

@@ -1,16 +1,20 @@
-import React, { useState } from 'react';
-import { Modal, Input, Button, message, Alert } from 'antd';
-import { ImportOutlined } from '@ant-design/icons';
+import { useState } from 'react';
+import { Alert, Button, Modal, TextArea, message } from '../ui';
 import { parseCurl, createRequestFromCurl } from '../../services/curl';
 import type { RequestConfig } from '../../types';
-
-const { TextArea } = Input;
 
 interface CurlImportProps {
   onImport: (request: RequestConfig) => void;
 }
 
-export const CurlImport: React.FC<CurlImportProps> = ({ onImport }) => {
+interface ParsedCurl {
+  method: string;
+  url: string;
+  headers: { key: string; value: string }[];
+  body?: string;
+}
+
+export const CurlImport = ({ onImport }: CurlImportProps) => {
   const [visible, setVisible] = useState(false);
   const [curlCommand, setCurlCommand] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -20,7 +24,6 @@ export const CurlImport: React.FC<CurlImportProps> = ({ onImport }) => {
       setError('请输入 Curl 命令');
       return;
     }
-
     const request = createRequestFromCurl(curlCommand);
     if (request) {
       onImport(request);
@@ -33,20 +36,22 @@ export const CurlImport: React.FC<CurlImportProps> = ({ onImport }) => {
     }
   };
 
+  const close = () => {
+    setVisible(false);
+    setCurlCommand('');
+    setError(null);
+  };
+
   return (
     <>
-      <Button icon={<ImportOutlined />} onClick={() => setVisible(true)}>
+      <Button icon="upload" onClick={() => setVisible(true)}>
         导入 Curl
       </Button>
       <Modal
         title="导入 Curl 命令"
         open={visible}
         onOk={handleImport}
-        onCancel={() => {
-          setVisible(false);
-          setCurlCommand('');
-          setError(null);
-        }}
+        onCancel={close}
         okText="导入"
         cancelText="取消"
         width={700}
@@ -56,8 +61,7 @@ export const CurlImport: React.FC<CurlImportProps> = ({ onImport }) => {
             message="粘贴 Curl 命令以创建新请求"
             description="支持从浏览器开发者工具复制的 Curl 命令"
             type="info"
-            showIcon
-            style={{ marginBottom: 16 }}
+            className="flaw-form-row"
           />
           <TextArea
             value={curlCommand}
@@ -66,19 +70,13 @@ export const CurlImport: React.FC<CurlImportProps> = ({ onImport }) => {
               setError(null);
             }}
             placeholder={`curl 'https://api.example.com/endpoint' -H 'Content-Type: application/json' -d '{"key": "value"}'`}
-            autoSize={{ minRows: 6, maxRows: 15 }}
+            rows={8}
+            mono
             className="curl-textarea"
           />
-          {error && (
-            <Alert
-              message={error}
-              type="error"
-              showIcon
-              style={{ marginTop: 16 }}
-            />
-          )}
+          {error && <Alert message={error} type="error" className="flaw-form-row" />}
           {curlCommand && !error && (
-            <div className="curl-preview" style={{ marginTop: 16 }}>
+            <div className="curl-preview flaw-form-row">
               <Preview curlCommand={curlCommand} />
             </div>
           )}
@@ -88,12 +86,9 @@ export const CurlImport: React.FC<CurlImportProps> = ({ onImport }) => {
   );
 };
 
-const Preview: React.FC<{ curlCommand: string }> = ({ curlCommand }) => {
-  const parsed = parseCurl(curlCommand);
-  
-  if (!parsed) {
-    return null;
-  }
+const Preview = ({ curlCommand }: { curlCommand: string }) => {
+  const parsed = parseCurl(curlCommand) as ParsedCurl | null;
+  if (!parsed) return null;
 
   return (
     <div className="curl-preview-content">
@@ -109,7 +104,9 @@ const Preview: React.FC<{ curlCommand: string }> = ({ curlCommand }) => {
           <strong>Headers:</strong>
           <ul>
             {parsed.headers.map((h, i) => (
-              <li key={i}>{h.key}: {h.value}</li>
+              <li key={i}>
+                {h.key}: {h.value}
+              </li>
             ))}
           </ul>
         </div>
@@ -117,7 +114,7 @@ const Preview: React.FC<{ curlCommand: string }> = ({ curlCommand }) => {
       {parsed.body && (
         <div className="preview-item">
           <strong>Body:</strong>
-          <pre style={{ margin: 0, maxHeight: 100, overflow: 'auto' }}>{parsed.body}</pre>
+          <pre>{parsed.body}</pre>
         </div>
       )}
     </div>

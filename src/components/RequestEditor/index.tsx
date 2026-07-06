@@ -1,37 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import {
-  Input,
-  Select,
-  Button,
-  Tabs,
-  Table,
-  Space,
-  Dropdown,
-  Modal,
-  message,
-  Popconfirm,
-  Tooltip,
-} from 'antd';
-import {
-  SendOutlined,
-  SaveOutlined,
-  PlusOutlined,
-  DeleteOutlined,
-  InboxOutlined,
-  CopyOutlined,
-  FileAddOutlined,
-  FormatPainterOutlined,
-} from '@ant-design/icons';
-import CodeMirror from '@uiw/react-codemirror';
-import { json, jsonParseLinter } from '@codemirror/lang-json';
-import { linter } from '@codemirror/lint';
-import type { TabsProps } from 'antd';
-import type { RequestConfig, KeyValue, HttpMethod, FormDataField, Collection } from '../../types';
+import { useState, useEffect } from 'react';
+import { Button, Dropdown, Tabs, message } from '../ui';
+import { RequestHeader } from './RequestHeader';
+import { KeyValueEditor } from './KeyValueEditor';
+import { BodyEditor } from './BodyEditor';
+import { SaveModal } from './SaveModal';
+import { CurlModal } from './CurlModal';
+import type { RequestConfig, Collection } from '../../types';
 import { exportToCurl } from '../../services/curl';
-import { open } from '@tauri-apps/plugin-dialog';
 import * as db from '../../services/database';
-
-const { TextArea } = Input;
 
 interface RequestEditorProps {
   request: RequestConfig | null;
@@ -44,27 +20,8 @@ interface RequestEditorProps {
   selectedCollectionId?: string | null;
 }
 
-const methodOptions: { value: HttpMethod; label: string; color?: string }[] = [
-  { value: 'GET', label: 'GET' },
-  { value: 'POST', label: 'POST' },
-  { value: 'PUT', label: 'PUT' },
-  { value: 'DELETE', label: 'DELETE' },
-  { value: 'PATCH', label: 'PATCH' },
-  { value: 'HEAD', label: 'HEAD' },
-  { value: 'OPTIONS', label: 'OPTIONS' },
-];
 
-const methodColors: Record<HttpMethod, string> = {
-  GET: '#52c41a',
-  POST: '#1890ff',
-  PUT: '#fa8c16',
-  DELETE: '#f5222d',
-  PATCH: '#13c2c2',
-  HEAD: '#722ed1',
-  OPTIONS: '#2f54eb',
-};
-
-export const RequestEditor: React.FC<RequestEditorProps> = ({
+export const RequestEditor = ({
   request,
   onRequestChange,
   onSend,
@@ -73,7 +30,7 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
   loading,
   isNew,
   selectedCollectionId: initialCollectionId,
-}) => {
+}: RequestEditorProps) => {
   const [activeTab, setActiveTab] = useState('params');
   const [nameModalVisible, setNameModalVisible] = useState(false);
   const [requestName, setRequestName] = useState('');
@@ -84,9 +41,7 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
   const [jsonError, setJsonError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (request) {
-      setRequestName(request.name);
-    }
+    if (request) setRequestName(request.name);
   }, [request]);
 
   useEffect(() => {
@@ -94,49 +49,8 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
   }, [initialCollectionId]);
 
   useEffect(() => {
-    loadCollections();
+    db.getCollections().then(setCollections);
   }, []);
-
-  const loadCollections = async () => {
-    const data = await db.getCollections();
-    setCollections(data);
-  };
-
-  // 格式化 JSON
-  const formatJson = () => {
-    if (!request?.body) return;
-    try {
-      const parsed = JSON.parse(request.body);
-      const formatted = JSON.stringify(parsed, null, 2);
-      updateRequest({ body: formatted });
-      setJsonError(null);
-      message.success('格式化成功');
-    } catch {
-      message.error('JSON 格式错误，无法格式化');
-    }
-  };
-
-  // 验证 JSON
-  const validateJson = (value: string) => {
-    if (!value.trim()) {
-      setJsonError(null);
-      return;
-    }
-    try {
-      JSON.parse(value);
-      setJsonError(null);
-    } catch (e) {
-      if (e instanceof Error) {
-        setJsonError(e.message);
-      }
-    }
-  };
-
-  // 处理 JSON body 变更
-  const handleJsonChange = (value: string) => {
-    updateRequest({ body: value });
-    validateJson(value);
-  };
 
   if (!request) {
     return (
@@ -149,104 +63,21 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
   }
 
   const updateRequest = (updates: Partial<RequestConfig>) => {
-    onRequestChange({
-      ...request,
-      ...updates,
-      updatedAt: new Date().toISOString(),
-    });
+    onRequestChange({ ...request, ...updates, updatedAt: new Date().toISOString() });
   };
-
-  const handleAddKeyValue = (field: 'headers' | 'params') => {
-    const newItems: KeyValue[] = [
-      ...request[field],
-      { key: '', value: '', enabled: true },
-    ];
-    updateRequest({ [field]: newItems });
-  };
-
-  const handleUpdateKeyValue = (
-    field: 'headers' | 'params',
-    index: number,
-    key: string,
-    value: string
-  ) => {
-    const newItems = [...request[field]];
-    if (key === 'key') {
-      newItems[index] = { ...newItems[index], key: value };
-    } else {
-      newItems[index] = { ...newItems[index], value };
-    }
-    updateRequest({ [field]: newItems });
-  };
-
-  const handleToggleKeyValue = (field: 'headers' | 'params', index: number) => {
-    const newItems = [...request[field]];
-    newItems[index] = { ...newItems[index], enabled: !newItems[index].enabled };
-    updateRequest({ [field]: newItems });
-  };
-
-  const handleDeleteKeyValue = (field: 'headers' | 'params', index: number) => {
-    const newItems = request[field].filter((_, i) => i !== index);
-    updateRequest({ [field]: newItems });
-  };
-
-  const handleAddFormField = () => {
-    const newItems: FormDataField[] = [
-      ...request.formData,
-      { key: '', value: '', type: 'text', enabled: true },
-    ];
-    updateRequest({ formData: newItems });
-  };
-
-  const handleUpdateFormField = (
-    index: number,
-    field: keyof FormDataField,
-    value: string | boolean
-  ) => {
-    const newItems = [...request.formData];
-    newItems[index] = { ...newItems[index], [field]: value };
-    updateRequest({ formData: newItems });
-  };
-
-  const handleToggleFormField = (index: number) => {
-    const newItems = [...request.formData];
-    newItems[index] = { ...newItems[index], enabled: !newItems[index].enabled };
-    updateRequest({ formData: newItems });
-  };
-
-  const handleDeleteFormField = (index: number) => {
-    const newItems = request.formData.filter((_, i) => i !== index);
-    updateRequest({ formData: newItems });
-  };
-
-  const handleSelectFile = async (index: number) => {
-    try {
-      const selected = await open({
-        multiple: false,
-        title: '选择文件',
-      });
-      if (selected) {
-        handleUpdateFormField(index, 'value', selected as string);
-      }
-    } catch (error) {
-      console.error('选择文件失败:', error);
-    }
-  };
-
-  const handleSaveWithName = () => {
-    if (!requestName.trim()) {
+  const handleSave = (name: string) => {
+    if (!name) {
       message.warning('请输入请求名称');
       return;
     }
-    updateRequest({ name: requestName.trim() });
+    updateRequest({ name });
     setNameModalVisible(false);
-    // 传递名称给 onSave
-    onSave(selectedCollectionId, requestName.trim());
+    onSave(selectedCollectionId, name);
   };
 
+
   const handleExportCurl = () => {
-    const curl = exportToCurl(request);
-    setCurlCommand(curl);
+    setCurlCommand(exportToCurl(request));
     setCurlModalVisible(true);
   };
 
@@ -259,381 +90,80 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
     }
   };
 
-  const keyValueColumns = (field: 'headers' | 'params') => [
-    {
-      title: '',
-      dataIndex: 'enabled',
-      width: 40,
-      render: (_: unknown, __: KeyValue, index: number) => (
-        <input
-          type="checkbox"
-          checked={request[field][index]?.enabled}
-          onChange={() => handleToggleKeyValue(field, index)}
-        />
-      ),
-    },
-    {
-      title: field === 'headers' ? 'Header Name' : 'Parameter',
-      dataIndex: 'key',
-      render: (text: string, _: KeyValue, index: number) => (
-        <Input
-          value={text}
-          placeholder={field === 'headers' ? 'Header' : 'Parameter'}
-          onChange={(e) => handleUpdateKeyValue(field, index, 'key', e.target.value)}
-          bordered={false}
-        />
-      ),
-    },
-    {
-      title: 'Value',
-      dataIndex: 'value',
-      render: (text: string, _: KeyValue, index: number) => (
-        <Input
-          value={text}
-          placeholder="Value"
-          onChange={(e) => handleUpdateKeyValue(field, index, 'value', e.target.value)}
-          bordered={false}
-        />
-      ),
-    },
-    {
-      title: '',
-      width: 50,
-      render: (_: unknown, __: KeyValue, index: number) => (
-        <Button
-          type="text"
-          danger
-          size="small"
-          icon={<DeleteOutlined />}
-          onClick={() => handleDeleteKeyValue(field, index)}
-        />
-      ),
-    },
-  ];
-
-  const formDataColumns = [
-    {
-      title: '',
-      dataIndex: 'enabled',
-      width: 40,
-      render: (_: unknown, __: FormDataField, index: number) => (
-        <input
-          type="checkbox"
-          checked={request.formData[index]?.enabled}
-          onChange={() => handleToggleFormField(index)}
-        />
-      ),
-    },
-    {
-      title: 'Key',
-      dataIndex: 'key',
-      render: (text: string, _: FormDataField, index: number) => (
-        <Input
-          value={text}
-          placeholder="Key"
-          onChange={(e) => handleUpdateFormField(index, 'key', e.target.value)}
-          bordered={false}
-        />
-      ),
-    },
-    {
-      title: 'Type',
-      dataIndex: 'type',
-      width: 100,
-      render: (text: string, _: FormDataField, index: number) => (
-        <Select
-          value={text}
-          onChange={(value) => handleUpdateFormField(index, 'type', value)}
-          options={[
-            { value: 'text', label: 'Text' },
-            { value: 'file', label: 'File' },
-          ]}
-          bordered={false}
-          size="small"
-        />
-      ),
-    },
-    {
-      title: 'Value',
-      dataIndex: 'value',
-      render: (text: string, record: FormDataField, index: number) => (
-        record.type === 'file' ? (
-          <Space>
-            <Input
-              value={text}
-              placeholder="选择文件..."
-              onChange={(e) => handleUpdateFormField(index, 'value', e.target.value)}
-              bordered={false}
-              style={{ flex: 1 }}
-            />
-            <Button
-              size="small"
-              icon={<FileAddOutlined />}
-              onClick={() => handleSelectFile(index)}
-            >
-              选择
-            </Button>
-          </Space>
-        ) : (
-          <Input
-            value={text}
-            placeholder="Value"
-            onChange={(e) => handleUpdateFormField(index, 'value', e.target.value)}
-            bordered={false}
-          />
-        )
-      ),
-    },
-    {
-      title: '',
-      width: 50,
-      render: (_: unknown, __: FormDataField, index: number) => (
-        <Button
-          type="text"
-          danger
-          size="small"
-          icon={<DeleteOutlined />}
-          onClick={() => handleDeleteFormField(index)}
-        />
-      ),
-    },
-  ];
-
-  const tabs: TabsProps['items'] = [
+  const tabs = [
     {
       key: 'params',
       label: 'Params',
       children: (
-        <div className="key-value-table">
-          <Table
-            dataSource={request.params}
-            columns={keyValueColumns('params')}
-            pagination={false}
-            size="small"
-            rowKey={(_, index) => `param-${index}`}
-          />
-          <Button type="dashed" icon={<PlusOutlined />} onClick={() => handleAddKeyValue('params')} block>
-            添加参数
-          </Button>
-        </div>
+        <KeyValueEditor
+          items={request.params}
+          field="params"
+          onChange={(params) => updateRequest({ params })}
+        />
       ),
     },
     {
       key: 'headers',
       label: 'Headers',
       children: (
-        <div className="key-value-table">
-          <Table
-            dataSource={request.headers}
-            columns={keyValueColumns('headers')}
-            pagination={false}
-            size="small"
-            rowKey={(_, index) => `header-${index}`}
-          />
-          <Button type="dashed" icon={<PlusOutlined />} onClick={() => handleAddKeyValue('headers')} block>
-            添加 Header
-          </Button>
-        </div>
+        <KeyValueEditor
+          items={request.headers}
+          field="headers"
+          onChange={(headers) => updateRequest({ headers })}
+        />
       ),
     },
     {
       key: 'body',
       label: 'Body',
       children: (
-        <div className="body-editor">
-          <Space className="body-type-selector">
-            <span>类型:</span>
-            <Select
-              value={request.bodyType}
-              onChange={(value) => updateRequest({ bodyType: value })}
-              options={[
-                { value: 'none', label: 'None' },
-                { value: 'json', label: 'JSON' },
-                { value: 'form', label: 'Form Data' },
-                { value: 'multipart', label: 'Multipart' },
-                { value: 'raw', label: 'Raw' },
-              ]}
-              style={{ width: 120 }}
-            />
-            {request.bodyType === 'json' && (
-              <Tooltip title="格式化 JSON">
-                <Button
-                  size="small"
-                  icon={<FormatPainterOutlined />}
-                  onClick={formatJson}
-                >
-                  格式化
-                </Button>
-              </Tooltip>
-            )}
-          </Space>
-          {request.bodyType === 'multipart' && (
-            <div className="multipart-editor">
-              <Table
-                dataSource={request.formData}
-                columns={formDataColumns}
-                pagination={false}
-                size="small"
-                rowKey={(_, index) => `form-${index}`}
-              />
-              <Button type="dashed" icon={<PlusOutlined />} onClick={handleAddFormField} block>
-                添加字段
-              </Button>
-            </div>
-          )}
-          {request.bodyType === 'json' && (
-            <div className="json-editor-container">
-              <CodeMirror
-                value={request.body}
-                height="500px"
-                extensions={[json(), linter(jsonParseLinter())]}
-                onChange={(value) => handleJsonChange(value)}
-                theme="dark"
-                placeholder='{"key": "value"}'
-              />
-              {jsonError && (
-                <div className="json-error" style={{ color: '#ff4d4f', fontSize: 12, marginTop: 4 }}>
-                  JSON 错误: {jsonError}
-                </div>
-              )}
-            </div>
-          )}
-          {request.bodyType !== 'none' && request.bodyType !== 'multipart' && request.bodyType !== 'json' && (
-            <TextArea
-              value={request.body}
-              onChange={(e) => updateRequest({ body: e.target.value })}
-              placeholder="Request body"
-              className="body-textarea"
-              autoSize={{ minRows: 10, maxRows: 20 }}
-            />
-          )}
-        </div>
+        <BodyEditor
+          request={request}
+          onChange={updateRequest}
+          jsonError={jsonError}
+          onJsonError={setJsonError}
+        />
       ),
     },
   ];
-
   return (
     <div className="request-editor">
-      <div className="request-header">
-        <Input
-          className="request-name"
-          value={request.name}
-          onChange={(e) => updateRequest({ name: e.target.value })}
-          placeholder="请求名称"
-          bordered={false}
-        />
-      </div>
-      <div className="request-url-bar">
-        <Select
-          value={request.method}
-          onChange={(value) => updateRequest({ method: value })}
-          options={methodOptions}
-          style={{ width: 100 }}
-          className={`method-select method-${request.method.toLowerCase()}`}
-        />
-        <Input
-          className="url-input"
-          value={request.url}
-          onChange={(e) => updateRequest({ url: e.target.value })}
-          placeholder="输入请求 URL"
-          onPressEnter={onSend}
-        />
-        <Button
-          type="primary"
-          icon={<SendOutlined />}
-          onClick={onSend}
-          loading={loading}
-          style={{ backgroundColor: methodColors[request.method], borderColor: methodColors[request.method] }}
-        >
-          发送
-        </Button>
-      </div>
+      <RequestHeader request={request} loading={loading} onChange={updateRequest} onSend={onSend} />
       <div className="request-actions">
-        <Button icon={<SaveOutlined />} onClick={() => setNameModalVisible(true)}>
+        <Button icon="save" onClick={() => setNameModalVisible(true)}>
           {isNew ? '保存' : '更新'}
         </Button>
         {!isNew && (
-          <Popconfirm
-            title="确定归档此请求？"
-            onConfirm={onArchive}
-            okText="确定"
-            cancelText="取消"
-          >
-            <Button icon={<InboxOutlined />}>归档</Button>
-          </Popconfirm>
+          <Button icon="archive" onClick={onArchive}>
+            归档
+          </Button>
         )}
         <Dropdown
-          menu={{
-            items: [
-              { key: 'curl', label: '导出为 Curl', icon: <CopyOutlined />, onClick: handleExportCurl },
-            ],
-          }}
+          items={[{ key: 'curl', label: '导出为 Curl', icon: 'copy', onClick: handleExportCurl }]}
         >
-          <Button>更多</Button>
+          <Button icon="more-horizontal">更多</Button>
         </Dropdown>
       </div>
-      <div className='container'>
-        <Tabs
-          activeKey={activeTab}
-          onChange={setActiveTab}
-          items={tabs}
-          className="request-tabs"
-        />
+      <div className="container">
+        <Tabs activeKey={activeTab} onChange={setActiveTab} items={tabs} className="request-tabs" />
       </div>
-      <Modal
-        title="保存请求"
+      <SaveModal
         open={nameModalVisible}
-        onOk={handleSaveWithName}
+        name={requestName}
+        collectionId={selectedCollectionId}
+        collections={collections}
+        onOk={handleSave}
         onCancel={() => setNameModalVisible(false)}
-        okText="保存"
-        cancelText="取消"
-      >
-        <div style={{ marginBottom: 16 }}>
-          <label style={{ display: 'block', marginBottom: 8 }}>请求名称</label>
-          <Input
-            placeholder="请求名称"
-            value={requestName}
-            onChange={(e) => setRequestName(e.target.value)}
-            onPressEnter={handleSaveWithName}
-          />
-        </div>
-        <div>
-          <label style={{ display: 'block', marginBottom: 8 }}>保存到集合</label>
-          <Select
-            style={{ width: '100%' }}
-            value={selectedCollectionId}
-            onChange={setSelectedCollectionId}
-            placeholder="选择集合（可选）"
-            allowClear
-            options={[
-              { value: null, label: '未分类' },
-              ...collections.map(c => ({ value: c.id, label: c.name })),
-            ]}
-          />
-        </div>
-      </Modal>
+        onCollectionChange={setSelectedCollectionId}
+      />
 
-      <Modal
-        title="Curl 命令"
+
+      <CurlModal
         open={curlModalVisible}
-        onCancel={() => setCurlModalVisible(false)}
-        footer={[
-          <Button key="copy" type="primary" onClick={handleCopyCurl}>
-            复制
-          </Button>,
-          <Button key="close" onClick={() => setCurlModalVisible(false)}>
-            关闭
-          </Button>,
-        ]}
-        width={700}
-      >
-        <TextArea
-          value={curlCommand}
-          rows={10}
-          readOnly
-          style={{ fontFamily: 'monospace' }}
-        />
-      </Modal>
+        command={curlCommand}
+        onClose={() => setCurlModalVisible(false)}
+        onCopy={handleCopyCurl}
+      />
     </div>
   );
 };

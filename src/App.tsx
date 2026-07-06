@@ -1,288 +1,125 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { Layout, message, ConfigProvider, theme } from 'antd';
+import { useState, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { RequestEditor } from './components/RequestEditor';
 import { ResponseViewer } from './components/ResponseViewer';
 import { CurlImport } from './components/CurlImport';
-import type { RequestConfig, ResponseData, SidebarTab, SavedRequest, HistoryItem, ArchivedRequest } from './types';
-import { initDatabase, createSavedRequest, updateSavedRequest, createHistoryItem, createArchivedRequest, deleteSavedRequest } from './services/database';
-import { sendRequest } from './services/http';
-import { v4 as uuidv4 } from 'uuid';
+import { ToastProvider, message, Icon } from './components/ui';
+import { useResizablePanels } from './hooks/useResizablePanels';
+import { useRequestActions } from './hooks/useRequestActions';
+import type { SidebarTab } from './types';
+import { initDatabase } from './services/database';
 
-const { Content } = Layout;
+const STORAGE_THEME_KEY = 'flaw-theme';
 
-const createEmptyRequest = (): RequestConfig => ({
-  id: uuidv4(),
-  name: '未命名请求',
-  method: 'GET',
-  url: '',
-  headers: [],
-  params: [],
-  body: '',
-  bodyType: 'none',
-  formData: [],
-  createdAt: new Date().toISOString(),
-  updatedAt: new Date().toISOString(),
-});
+const initTheme = () => {
+  const saved = localStorage.getItem(STORAGE_THEME_KEY);
+  return saved === 'light' || saved === 'dark' ? saved : 'dark';
+};
 
-function App() {
-  const [currentRequest, setCurrentRequest] = useState<RequestConfig | null>(null);
-  const [response, setResponse] = useState<ResponseData | null>(null);
-  const [loading, setLoading] = useState(false);
+function AppContent() {
   const [activeTab, setActiveTab] = useState<SidebarTab>('collections');
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [dbInitialized, setDbInitialized] = useState(false);
-  const [isNewRequest, setIsNewRequest] = useState(true);
-  const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
+  const [theme, setTheme] = useState<'dark' | 'light'>(initTheme);
+  const { sidebarWidth, editorWidth, startResizeSidebar, startResizeEditor } = useResizablePanels();
+  const {
+    currentRequest,
+    response,
+    loading,
+    isNewRequest,
+    selectedCollectionId,
+    setCurrentRequest,
+    onSend,
+    onSave,
+    onArchive,
+    onSelectRequest,
+    onNewRequest,
+    onImportCurl,
+    refreshTrigger,
+  } = useRequestActions();
 
-  // 动态宽度状态
-  const [sidebarWidth, setSidebarWidth] = useState(300);
-  const [editorWidth, setEditorWidth] = useState(500);
-  const isResizingSidebar = useRef(false);
-  const isResizingEditor = useRef(false);
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem(STORAGE_THEME_KEY, theme);
+  }, [theme]);
 
   useEffect(() => {
     initDatabase()
-      .then(() => {
-        setDbInitialized(true);
-      })
+      .then(() => setDbInitialized(true))
       .catch((err) => {
         console.error('Database init error:', err);
-        message.error('数据库初始化失败');
+        const isTauriMissing =
+          err instanceof TypeError &&
+          (err.message.includes('__TAURI_INTERNALS__') || err.message.includes('invoke'));
+        if (isTauriMissing) {
+          message.error('请在 Tauri 环境中运行：pnpm tauri dev');
+        } else {
+          message.error('数据库初始化失败');
+        }
       });
   }, []);
 
-  // 处理拖拽调整宽度
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (isResizingSidebar.current) {
-        const newWidth = Math.max(200, Math.min(500, e.clientX));
-        setSidebarWidth(newWidth);
-      }
-      if (isResizingEditor.current) {
-        const containerLeft = sidebarWidth;
-        const newWidth = Math.max(300, Math.min(e.clientX - containerLeft, window.innerWidth - containerLeft - 300));
-        setEditorWidth(newWidth);
-      }
-    };
 
-    const handleMouseUp = () => {
-      isResizingSidebar.current = false;
-      isResizingEditor.current = false;
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-    };
-
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [sidebarWidth]);
-
-  const startResizeSidebar = () => {
-    isResizingSidebar.current = true;
-    document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
-  };
-
-  const startResizeEditor = () => {
-    isResizingEditor.current = true;
-    document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
-  };
-
-  const handleSendRequest = useCallback(async () => {
-    if (!currentRequest || !currentRequest.url) {
-      message.warning('请输入请求 URL');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const responseData = await sendRequest(currentRequest);
-      setResponse(responseData);
-
-      const historyItem: HistoryItem = {
-        id: uuidv4(),
-        requestId: null,
-        name: currentRequest.name,
-        method: currentRequest.method,
-        url: currentRequest.url,
-        headers: currentRequest.headers,
-        params: currentRequest.params,
-        body: currentRequest.body,
-        bodyType: currentRequest.bodyType,
-        formData: currentRequest.formData || [],
-        statusCode: responseData.status,
-        responseTime: responseData.time,
-        responseSize: responseData.size,
-        createdAt: new Date().toISOString(),
-      };
-      await createHistoryItem(historyItem);
-      setRefreshTrigger((prev) => prev + 1);
-    } catch (err) {
-      message.error(`请求失败: ${err}`);
-    } finally {
-      setLoading(false);
-    }
-  }, [currentRequest]);
-
-  const handleSaveRequest = useCallback(async (collectionId: string | null, name: string) => {
-    if (!currentRequest) return;
-
-    try {
-      if (isNewRequest) {
-        await createSavedRequest({
-          ...currentRequest,
-          id: uuidv4(),
-          name: name,
-          collectionId: collectionId,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        });
-        message.success('请求已保存');
-      } else {
-        await updateSavedRequest({
-          ...currentRequest,
-          name: name,
-          collectionId: collectionId,
-          updatedAt: new Date().toISOString(),
-        });
-        message.success('请求已更新');
-      }
-      setRefreshTrigger((prev) => prev + 1);
-      setIsNewRequest(false);
-    } catch (err) {
-      message.error(`保存失败: ${err}`);
-    }
-  }, [currentRequest, isNewRequest]);
-
-  const handleArchiveRequest = useCallback(async () => {
-    if (!currentRequest || isNewRequest) return;
-
-    try {
-      await createArchivedRequest({
-        id: uuidv4(),
-        name: currentRequest.name,
-        method: currentRequest.method,
-        url: currentRequest.url,
-        headers: currentRequest.headers,
-        params: currentRequest.params,
-        body: currentRequest.body,
-        bodyType: currentRequest.bodyType,
-        formData: currentRequest.formData || [],
-        archivedAt: new Date().toISOString(),
-        createdAt: currentRequest.createdAt,
-      });
-      await deleteSavedRequest(currentRequest.id);
-      message.success('请求已归档');
-      setCurrentRequest(null);
-      setResponse(null);
-      setRefreshTrigger((prev) => prev + 1);
-    } catch (err) {
-      message.error(`归档失败: ${err}`);
-    }
-  }, [currentRequest, isNewRequest]);
-
-  const handleSelectRequest = useCallback((request: SavedRequest | HistoryItem | ArchivedRequest) => {
-    const config: RequestConfig = {
-      id: request.id,
-      name: request.name,
-      method: request.method,
-      url: request.url,
-      headers: request.headers,
-      params: request.params,
-      body: request.body,
-      bodyType: request.bodyType,
-      formData: request.formData || [],
-      createdAt: 'createdAt' in request ? request.createdAt : new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    setCurrentRequest(config);
-    setResponse(null);
-    // 只有 SavedRequest（有 collectionId 属性）才视为已保存的请求，历史记录和归档都视为新请求
-    const isSavedRequest = 'collectionId' in request;
-    setIsNewRequest(!isSavedRequest);
-    setSelectedCollectionId(isSavedRequest ? request.collectionId : null);
-  }, []);
-
-  const handleNewRequest = useCallback(() => {
-    setCurrentRequest(createEmptyRequest());
-    setResponse(null);
-    setIsNewRequest(true);
-    setSelectedCollectionId(null);
-  }, []);
-
-  const handleImportCurl = useCallback((request: RequestConfig) => {
-    setCurrentRequest(request);
-    setResponse(null);
-    setIsNewRequest(true);
-    setSelectedCollectionId(null);
-  }, []);
+  const toggleTheme = () => setTheme((t) => (t === 'dark' ? 'light' : 'dark'));
 
   if (!dbInitialized) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-        <p>正在初始化...</p>
+      <div className="flaw-spin flaw-spin-md" style={{ height: '100vh', justifyContent: 'center' }}>
+        <span className="flaw-spinner" />
+        <span className="flaw-spin-tip">正在初始化...</span>
       </div>
     );
   }
 
   return (
-    <ConfigProvider
-      theme={{
-        algorithm: theme.defaultAlgorithm,
-        token: {
-          borderRadius: 6,
-        },
-      }}
-    >
-      <Layout className="app-layout">
-        <Sidebar
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
-          onSelectRequest={handleSelectRequest}
-          onNewRequest={handleNewRequest}
-          refreshTrigger={refreshTrigger}
-          width={sidebarWidth}
-        />
-        <div
-          className="resize-bar resize-bar-sidebar"
-          onMouseDown={startResizeSidebar}
-        />
-        <Layout className="main-layout">
-          <Content className="main-content">
-            <div className="toolbar">
-              <CurlImport onImport={handleImportCurl} />
-            </div>
-            <div className="editor-response-container">
-              <div className="editor-panel" style={{ width: editorWidth }}>
-                <RequestEditor
-                  request={currentRequest}
-                  onRequestChange={setCurrentRequest}
-                  onSend={handleSendRequest}
-                  onSave={handleSaveRequest}
-                  onArchive={handleArchiveRequest}
-                  loading={loading}
-                  isNew={isNewRequest}
-                  selectedCollectionId={selectedCollectionId}
-                />
-              </div>
-              <div
-                className="resize-bar resize-bar-editor"
-                onMouseDown={startResizeEditor}
+    <div className="app-layout">
+      <Sidebar
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        onSelectRequest={onSelectRequest}
+        onNewRequest={onNewRequest}
+        refreshTrigger={refreshTrigger}
+        width={sidebarWidth}
+      />
+      <div className="resize-bar resize-bar-sidebar" onMouseDown={startResizeSidebar} />
+      <div className="main-layout">
+        <div className="main-content">
+          <div className="toolbar">
+            <CurlImport onImport={onImportCurl} />
+            <div style={{ flex: 1 }} />
+            <button className="theme-toggle" onClick={toggleTheme} title="切换主题">
+              <Icon name={theme === 'dark' ? 'sun' : 'moon'} />
+            </button>
+          </div>
+          <div className="editor-response-container">
+            <div className="editor-panel" style={{ width: editorWidth }}>
+              <RequestEditor
+                request={currentRequest}
+                onRequestChange={setCurrentRequest}
+                onSend={onSend}
+                onSave={onSave}
+                onArchive={onArchive}
+                loading={loading}
+                isNew={isNewRequest}
+                selectedCollectionId={selectedCollectionId}
               />
-              <div className="response-panel" style={{ flex: 1 }}>
-                <ResponseViewer response={response} loading={loading} />
-              </div>
             </div>
-          </Content>
-        </Layout>
-      </Layout>
-    </ConfigProvider>
+            <div className="resize-bar resize-bar-editor" onMouseDown={startResizeEditor} />
+            <div className="response-panel">
+              <ResponseViewer response={response} loading={loading} />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function App() {
+  return (
+    <ToastProvider>
+      <AppContent />
+    </ToastProvider>
   );
 }
 
