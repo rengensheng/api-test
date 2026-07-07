@@ -1066,6 +1066,17 @@ body {
   align-items: center;
 }
 
+.response-viewer .container {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.response-viewer .flaw-tabs-content {
+  display: flex;
+  flex-direction: column;
+}
+
 .response-status {
   display: flex;
   align-items: center;
@@ -1083,10 +1094,10 @@ body {
   font-family: var(--font-mono);
   font-size: 12px;
 }
-
 .response-body {
   padding: 12px;
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -1138,6 +1149,8 @@ body {
 
 .response-headers {
   padding: 12px;
+  flex: 1;
+  overflow: auto;
 }
 .headers-table {
   width: 100%;
